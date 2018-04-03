@@ -1,7 +1,7 @@
 //
 //  TwitterText.m
 //
-//  Copyright 2012-2017 Twitter, Inc.
+//  Copyright 2012-2014 Twitter, Inc.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -10,7 +10,6 @@
 //  http://www.apache.org/licenses/LICENSE-2.0
 //
 
-#import "NSURL+IFUnicodeURL.h"
 #import "TwitterText.h"
 
 #pragma mark - Regular Expressions
@@ -33,32 +32,33 @@
 #define TWUIdeographicSpace         @"\\u3000"
 
 #define TWUUnicodeSpaces \
-    TWUControlCharacters \
-    TWUSpace \
-    TWUControl85 \
-    TWUNoBreakSpace \
-    TWUOghamBreakSpace \
-    TWUMongolianVowelSeparator \
-    TWUWhiteSpaces \
-    TWULineSeparator \
-    TWUParagraphSeparator \
-    TWUNarrowNoBreakSpace \
-    TWUMediumMathematicalSpace \
-    TWUIdeographicSpace
+TWUControlCharacters \
+TWUSpace \
+TWUControl85 \
+TWUNoBreakSpace \
+TWUOghamBreakSpace \
+TWUMongolianVowelSeparator \
+TWUWhiteSpaces \
+TWULineSeparator \
+TWUParagraphSeparator \
+TWUNarrowNoBreakSpace \
+TWUMediumMathematicalSpace \
+TWUIdeographicSpace
 
 #define TWUInvalidCharacters        @"\\uFFFE\\uFEFF\\uFFFF\\u202A-\\u202E"
-#define TWUInvalidCharactersPattern @"[" TWUInvalidCharacters @"]"
 
 #define TWULatinAccents \
-    @"\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u00FF\\u0100-\\u024F\\u0253-\\u0254\\u0256-\\u0257\\u0259\\u025b\\u0263\\u0268\\u026F\\u0272\\u0289\\u02BB\\u1E00-\\u1EFF"
+@"\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u00FF\\u0100-\\u024F\\u0253-\\u0254\\u0256-\\u0257\\u0259\\u025b\\u0263\\u0268\\u026F\\u0272\\u0289\\u02BB\\u1E00-\\u1EFF"
+
 
 //
 // Hashtag
 //
 
-#define TWUPunctuationChars                             @"-_!\"#$%&'\\(\\)*+,./:;<=>?@\\[\\]^`\\{|}~"
-#define TWUPunctuationCharsWithoutHyphen                @"_!\"#$%&'\\(\\)*+,./:;<=>?@\\[\\]^`\\{|}~"
-#define TWUPunctuationCharsWithoutHyphenAndUnderscore   @"!\"#$%&'\\(\\)*+,./:;<=>?@\\[\\]^`\\{|}~"
+#define TWUPunctuationChars                             @"\\-_!\"#$%&'()*+,./:;<=>?@\\[\\]^`{|}~"
+#define TWUPunctuationCharsWithoutHyphen                @"_!\"#$%&'()*+,./:;<=>?@\\[\\]^`{|}~"
+#define TWUPunctuationCharsWithoutHyphenAndUnderscore   @"!\"#$%&'()*+,./:;<=>?@\\[\\]^`{|}~"
+#define TWUCtrlChars                                    @"\\x00-\\x1F\\x7F"
 
 #define TWHashtagAlpha                          @"[\\p{L}\\p{M}]"
 #define TWHashtagSpecialChars                   @"_\\u200c\\u200d\\ua67e\\u05be\\u05f3\\u05f4\\uff5e\\u301c\\u309b\\u309c\\u30a0\\u30fb\\u3003\\u0f0b\\u0f0c\\u00b7"
@@ -66,12 +66,12 @@
 #define TWUHashtagBoundaryInvalidChars          @"&\\p{L}\\p{M}\\p{Nd}" TWHashtagSpecialChars
 
 #define TWUHashtagBoundary \
-@"^|\\ufe0e|\\ufe0f|$|[^" \
-    TWUHashtagBoundaryInvalidChars \
+@"^|$|[^" \
+TWUHashtagBoundaryInvalidChars \
 @"]"
 
 #define TWUValidHashtag \
-    @"(?:" TWUHashtagBoundary @")([#＃](?!\ufe0f|\u20e3)" TWUHashtagAlphanumeric @"*" TWHashtagAlpha TWUHashtagAlphanumeric @"*)"
+@"(?:" TWUHashtagBoundary @")([#＃](?!\ufe0f|\u20e3)" TWUHashtagAlphanumeric @"*" TWHashtagAlpha TWUHashtagAlphanumeric @"*)"
 
 #define TWUEndHashTagMatch      @"\\A(?:[#＃]|://)"
 
@@ -81,282 +81,273 @@
 
 #define TWUSymbol               @"[a-z]{1,6}(?:[._][a-z]{1,2})?"
 #define TWUValidSymbol \
-    @"(?:^|[" TWUUnicodeSpaces @"])" \
-    @"(\\$" TWUSymbol @")" \
-    @"(?=$|\\s|[" TWUPunctuationChars @"])"
+@"(?:^|[" TWUUnicodeSpaces @"])" \
+@"(\\$" TWUSymbol @")" \
+@"(?=$|\\s|[" TWUPunctuationChars @"])"
 
 //
 // Mention and list name
 //
 
-#define TWUValidMentionPrecedingChars   @"(?:[^a-z0-9_!#$%&*@＠]|^|(?:^|[^a-z0-9_+~.-])RT:?)"
+#define TWUValidMentionPrecedingChars   @"(?:[^a-zA-Z0-9_!#$%&*@＠]|^|(?:^|[^a-zA-Z0-9_+~.-])RT:?)"
 #define TWUAtSigns                      @"[@＠]"
-#define TWUValidUsername                @"\\A" TWUAtSigns @"[a-z0-9_]{1,20}\\z"
-#define TWUValidList                    @"\\A" TWUAtSigns @"[a-z0-9_]{1,20}/[a-z][a-z0-9_\\-]{0,24}\\z"
+#define TWUValidUsername                @"\\A" TWUAtSigns @"[a-zA-Z0-9_+~.-]{1,20}\\z"
+#define TWUValidList                    @"\\A" TWUAtSigns @"[a-zA-Z0-9_+~.-]{1,20}/[a-zA-Z][a-zA-Z0-9_+~.-\\-]{0,24}\\z"
 
 #define TWUValidMentionOrList \
-    @"(" TWUValidMentionPrecedingChars @")" \
-    @"(" TWUAtSigns @")" \
-    @"([a-z0-9_]{1,20})" \
-    @"(/[a-z][a-z0-9_\\-]{0,24})?"
+@"(" TWUValidMentionPrecedingChars @")" \
+@"(" TWUAtSigns @")" \
+@"([a-zA-Z0-9_+~.-]{1,50})" \
+@"(/[a-zA-Z][a-zA-Z0-9_\\-]{0,24})?"
 
-#define TWUValidReply                   @"\\A(?:[" TWUUnicodeSpaces @"])*" TWUAtSigns @"([a-z0-9_]{1,20})"
+#define TWUValidReply                   @"\\A(?:[" TWUUnicodeSpaces @"])*" TWUAtSigns @"([a-zA-Z0-9_+~.-]{1,20})"
 #define TWUEndMentionMatch              @"\\A(?:" TWUAtSigns @"|[" TWULatinAccents @"]|://)"
 
 //
 // URL
 //
 
-#define TWUValidURLPrecedingChars       @"(?:[^a-z0-9@＠$#＃" TWUInvalidCharacters @"]|^)"
+#define TWUValidURLPrecedingChars       @"(?:[^a-zA-Z0-9@＠$#＃" TWUInvalidCharacters @"]|^)"
 
-// These patterns extract domains that are ascii+latin only. We separately check
-// for unencoded domains with unicode characters elsewhere.
-#define TWUValidURLCharacters           @"[a-z0-9" TWULatinAccents @"]"
-#define TWUValidURLSubdomain            @"(?>(?:" TWUValidURLCharacters @"[" TWUValidURLCharacters @"\\-_]{0,255})?" TWUValidURLCharacters @"\\.)"
-#define TWUValidURLDomain               @"(?:(?:" TWUValidURLCharacters @"[" TWUValidURLCharacters @"\\-]{0,255})?" TWUValidURLCharacters @"\\.)"
-
-// Used to extract domains that contain unencoded unicode.
-#define TWUValidURLUnicodeCharacters \
+#define TWUDomainValidStartEndChars \
 @"[^" \
-    TWUPunctuationChars \
-    @"\\s\\p{Z}\\p{InGeneralPunctuation}" \
+TWUPunctuationChars \
+TWUCtrlChars \
+TWUInvalidCharacters \
+TWUUnicodeSpaces \
 @"]"
 
-#define TWUValidURLUnicodeDomain        @"(?:(?:" TWUValidURLUnicodeCharacters @"[" TWUValidURLUnicodeCharacters @"\\-]{0,255})?" TWUValidURLUnicodeCharacters @"\\.)"
+#define TWUSubdomainValidMiddleChars \
+@"[^" \
+TWUPunctuationCharsWithoutHyphenAndUnderscore \
+TWUCtrlChars \
+TWUInvalidCharacters \
+TWUUnicodeSpaces \
+@"]"
 
-#define TWUValidPunycode                @"(?:xn--[-0-9a-z]+)"
+#define TWUDomainValidMiddleChars \
+@"[^" \
+TWUPunctuationCharsWithoutHyphen \
+TWUCtrlChars \
+TWUInvalidCharacters \
+TWUUnicodeSpaces \
+@"]"
 
-#define TWUValidDomain \
+#define TWUValidSubdomain \
 @"(?:" \
-    TWUValidURLSubdomain @"*" TWUValidURLDomain \
-    @"(?:" TWUValidGTLD @"|" TWUValidCCTLD @"|" TWUValidPunycode @")" \
-@")" \
-@"|(?:(?<=https?://)" \
-  @"(?:" \
-    @"(?:" TWUValidURLDomain TWUValidCCTLD @")" \
-    @"|(?:" \
-      TWUValidURLUnicodeDomain @"{0,255}" TWUValidURLUnicodeDomain \
-      @"(?:" TWUValidGTLD @"|" TWUValidCCTLD @")" \
-    @")" \
-  @")" \
-@")" \
-@"|(?:" \
-  TWUValidURLDomain TWUValidCCTLD @"(?=/)" \
+@"(?:" TWUDomainValidStartEndChars TWUSubdomainValidMiddleChars @"*)?" TWUDomainValidStartEndChars @"\\." \
 @")"
 
-#define TWUValidPortNumber              @"[0-9]++"
-#define TWUValidGeneralURLPathChars     @"[a-z\\p{Cyrillic}0-9!\\*';:=+,.$/%#\\[\\]\\-\\u2013_~&|@" TWULatinAccents @"]"
-
-#define TWUValidURLBalancedParens               \
-@"\\(" \
-    @"(?:" \
-        TWUValidGeneralURLPathChars @"+" \
-        @"|" \
-        @"(?:" \
-          TWUValidGeneralURLPathChars @"*" \
-          @"\\(" \
-            TWUValidGeneralURLPathChars @"+" \
-          @"\\)" \
-        TWUValidGeneralURLPathChars @"*" \
-      @")" \
-    @")" \
-@"\\)"
-
-#define TWUValidURLPathEndingChars      @"[a-z\\p{Cyrillic}0-9=_#/+\\-" TWULatinAccents @"]|(?:" TWUValidURLBalancedParens @")"
-
-#define TWUValidPath @"(?:" \
-  @"(?:" \
-    TWUValidGeneralURLPathChars @"*" \
-    @"(?:" TWUValidURLBalancedParens TWUValidGeneralURLPathChars @"*)*" \
-    TWUValidURLPathEndingChars \
-  @")|(?:@" TWUValidGeneralURLPathChars @"+/)" \
+#define TWUValidDomainName \
+@"(?:" \
+@"(?:" TWUDomainValidStartEndChars TWUDomainValidMiddleChars @"*)?" TWUDomainValidStartEndChars @"\\." \
 @")"
-
-#define TWUValidURLQueryChars           @"[a-z0-9!?*'\\(\\);:&=+$/%#\\[\\]\\-_\\.,~|@]"
-#define TWUValidURLQueryEndingChars     @"[a-z0-9\\-_&=#/]"
-
-#define TWUValidURLPatternString \
-@"(" \
-  @"(" TWUValidURLPrecedingChars @")" \
-  @"(" \
-    @"(https?://)?" \
-    @"(" TWUValidDomain @")" \
-    @"(?::(" TWUValidPortNumber @"))?" \
-    @"(/" \
-      TWUValidPath @"*+" \
-    @")?" \
-    @"(\\?" TWUValidURLQueryChars @"*" \
-            TWUValidURLQueryEndingChars @")?" \
-  @")" \
-@")"
-
-typedef NS_ENUM(NSInteger, TWUValidURLGroup) {
-    TWUValidURLGroupAll = 1,
-    TWUValidURLGroupPreceding,
-    TWUValidURLGroupURL,
-    TWUValidURLGroupProtocol,
-    TWUValidURLGroupDomain,
-    TWUValidURLGroupPort,
-    TWUValidURLGroupPath,
-    TWUValidURLGroupQueryString
-};
 
 #define TWUValidGTLD \
-@"(?:(?:" \
-    @"삼성|닷컴|닷넷|香格里拉|餐厅|食品|飞利浦|電訊盈科|集团|通販|购物|谷歌|诺基亚|联通|网络|网站|网店|网址|组织机构|移动|珠宝|点看|游戏|淡马锡|机构|書籍|时尚|新闻|政府|政务|" \
-    @"手表|手机|我爱你|慈善|微博|广东|工行|家電|娱乐|天主教|大拿|大众汽车|在线|嘉里大酒店|嘉里|商标|商店|商城|公益|公司|八卦|健康|信息|佛山|企业|中文网|中信|世界|ポイント|" \
-    @"ファッション|セール|ストア|コム|グーグル|クラウド|みんな|คอม|संगठन|नेट|कॉम|همراه|موقع|موبايلي|كوم|كاثوليك|عرب|شبكة|بيتك|بازار|" \
-    @"العليان|ارامكو|اتصالات|ابوظبي|קום|сайт|рус|орг|онлайн|москва|ком|католик|дети|zuerich|zone|zippo|zip|" \
-    @"zero|zara|zappos|yun|youtube|you|yokohama|yoga|yodobashi|yandex|yamaxun|yahoo|yachts|xyz|xxx|xperia|" \
-    @"xin|xihuan|xfinity|xerox|xbox|wtf|wtc|wow|world|works|work|woodside|wolterskluwer|wme|winners|wine|" \
-    @"windows|win|williamhill|wiki|wien|whoswho|weir|weibo|wedding|wed|website|weber|webcam|weatherchannel|" \
-    @"weather|watches|watch|warman|wanggou|wang|walter|walmart|wales|vuelos|voyage|voto|voting|vote|volvo|" \
-    @"volkswagen|vodka|vlaanderen|vivo|viva|vistaprint|vista|vision|visa|virgin|vip|vin|villas|viking|vig|" \
-    @"video|viajes|vet|versicherung|vermögensberatung|vermögensberater|verisign|ventures|vegas|vanguard|" \
-    @"vana|vacations|ups|uol|uno|university|unicom|uconnect|ubs|ubank|tvs|tushu|tunes|tui|tube|trv|trust|" \
-    @"travelersinsurance|travelers|travelchannel|travel|training|trading|trade|toys|toyota|town|tours|" \
-    @"total|toshiba|toray|top|tools|tokyo|today|tmall|tkmaxx|tjx|tjmaxx|tirol|tires|tips|tiffany|tienda|" \
-    @"tickets|tiaa|theatre|theater|thd|teva|tennis|temasek|telefonica|telecity|tel|technology|tech|team|" \
-    @"tdk|tci|taxi|tax|tattoo|tatar|tatamotors|target|taobao|talk|taipei|tab|systems|symantec|sydney|swiss|" \
-    @"swiftcover|swatch|suzuki|surgery|surf|support|supply|supplies|sucks|style|study|studio|stream|store|" \
-    @"storage|stockholm|stcgroup|stc|statoil|statefarm|statebank|starhub|star|staples|stada|srt|srl|" \
-    @"spreadbetting|spot|spiegel|space|soy|sony|song|solutions|solar|sohu|software|softbank|social|soccer|" \
-    @"sncf|smile|smart|sling|skype|sky|skin|ski|site|singles|sina|silk|shriram|showtime|show|shouji|" \
-    @"shopping|shop|shoes|shiksha|shia|shell|shaw|sharp|shangrila|sfr|sexy|sex|sew|seven|ses|services|" \
-    @"sener|select|seek|security|secure|seat|search|scot|scor|scjohnson|science|schwarz|schule|school|" \
-    @"scholarships|schmidt|schaeffler|scb|sca|sbs|sbi|saxo|save|sas|sarl|sapo|sap|sanofi|sandvikcoromant|" \
-    @"sandvik|samsung|samsclub|salon|sale|sakura|safety|safe|saarland|ryukyu|rwe|run|ruhr|rugby|rsvp|room|" \
-    @"rogers|rodeo|rocks|rocher|rmit|rip|rio|ril|rightathome|ricoh|richardli|rich|rexroth|reviews|review|" \
-    @"restaurant|rest|republican|report|repair|rentals|rent|ren|reliance|reit|reisen|reise|rehab|" \
-    @"redumbrella|redstone|red|recipes|realty|realtor|realestate|read|raid|radio|racing|qvc|quest|quebec|" \
-    @"qpon|pwc|pub|prudential|pru|protection|property|properties|promo|progressive|prof|productions|prod|" \
-    @"pro|prime|press|praxi|pramerica|post|porn|politie|poker|pohl|pnc|plus|plumbing|playstation|play|" \
-    @"place|pizza|pioneer|pink|ping|pin|pid|pictures|pictet|pics|piaget|physio|photos|photography|photo|" \
-    @"phone|philips|phd|pharmacy|pfizer|pet|pccw|pay|passagens|party|parts|partners|pars|paris|panerai|" \
-    @"panasonic|pamperedchef|page|ovh|ott|otsuka|osaka|origins|orientexpress|organic|org|orange|oracle|" \
-    @"open|ooo|onyourside|online|onl|ong|one|omega|ollo|oldnavy|olayangroup|olayan|okinawa|office|off|" \
-    @"observer|obi|nyc|ntt|nrw|nra|nowtv|nowruz|now|norton|northwesternmutual|nokia|nissay|nissan|ninja|" \
-    @"nikon|nike|nico|nhk|ngo|nfl|nexus|nextdirect|next|news|newholland|new|neustar|network|netflix|" \
-    @"netbank|net|nec|nba|navy|natura|nationwide|name|nagoya|nadex|nab|mutuelle|mutual|museum|mtr|mtpc|mtn|" \
-    @"msd|movistar|movie|mov|motorcycles|moto|moscow|mortgage|mormon|mopar|montblanc|monster|money|monash|" \
-    @"mom|moi|moe|moda|mobily|mobile|mobi|mma|mls|mlb|mitsubishi|mit|mint|mini|mil|microsoft|miami|metlife|" \
-    @"merckmsd|meo|menu|men|memorial|meme|melbourne|meet|media|med|mckinsey|mcdonalds|mcd|mba|mattel|" \
-    @"maserati|marshalls|marriott|markets|marketing|market|map|mango|management|man|makeup|maison|maif|" \
-    @"madrid|macys|luxury|luxe|lupin|lundbeck|ltda|ltd|lplfinancial|lpl|love|lotto|lotte|london|lol|loft|" \
-    @"locus|locker|loans|loan|lixil|living|live|lipsy|link|linde|lincoln|limo|limited|lilly|like|lighting|" \
-    @"lifestyle|lifeinsurance|life|lidl|liaison|lgbt|lexus|lego|legal|lefrak|leclerc|lease|lds|lawyer|law|" \
-    @"latrobe|latino|lat|lasalle|lanxess|landrover|land|lancome|lancia|lancaster|lamer|lamborghini|" \
-    @"ladbrokes|lacaixa|kyoto|kuokgroup|kred|krd|kpn|kpmg|kosher|komatsu|koeln|kiwi|kitchen|kindle|kinder|" \
-    @"kim|kia|kfh|kerryproperties|kerrylogistics|kerryhotels|kddi|kaufen|juniper|juegos|jprs|jpmorgan|joy|" \
-    @"jot|joburg|jobs|jnj|jmp|jll|jlc|jio|jewelry|jetzt|jeep|jcp|jcb|java|jaguar|iwc|iveco|itv|itau|" \
-    @"istanbul|ist|ismaili|iselect|irish|ipiranga|investments|intuit|international|intel|int|insure|" \
-    @"insurance|institute|ink|ing|info|infiniti|industries|immobilien|immo|imdb|imamat|ikano|iinet|ifm|" \
-    @"ieee|icu|ice|icbc|ibm|hyundai|hyatt|hughes|htc|hsbc|how|house|hotmail|hotels|hoteles|hot|hosting|" \
-    @"host|hospital|horse|honeywell|honda|homesense|homes|homegoods|homedepot|holiday|holdings|hockey|hkt|" \
-    @"hiv|hitachi|hisamitsu|hiphop|hgtv|hermes|here|helsinki|help|healthcare|health|hdfcbank|hdfc|hbo|haus|" \
-    @"hangout|hamburg|hair|guru|guitars|guide|guge|gucci|guardian|group|grocery|gripe|green|gratis|" \
-    @"graphics|grainger|gov|got|gop|google|goog|goodyear|goodhands|goo|golf|goldpoint|gold|godaddy|gmx|gmo|" \
-    @"gmbh|gmail|globo|global|gle|glass|glade|giving|gives|gifts|gift|ggee|george|genting|gent|gea|gdn|" \
-    @"gbiz|garden|gap|games|game|gallup|gallo|gallery|gal|fyi|futbol|furniture|fund|fun|fujixerox|fujitsu|" \
-    @"ftr|frontier|frontdoor|frogans|frl|fresenius|free|fox|foundation|forum|forsale|forex|ford|football|" \
-    @"foodnetwork|food|foo|fly|flsmidth|flowers|florist|flir|flights|flickr|fitness|fit|fishing|fish|" \
-    @"firmdale|firestone|fire|financial|finance|final|film|fido|fidelity|fiat|ferrero|ferrari|feedback|" \
-    @"fedex|fast|fashion|farmers|farm|fans|fan|family|faith|fairwinds|fail|fage|extraspace|express|exposed|" \
-    @"expert|exchange|everbank|events|eus|eurovision|etisalat|esurance|estate|esq|erni|ericsson|equipment|" \
-    @"epson|epost|enterprises|engineering|engineer|energy|emerck|email|education|edu|edeka|eco|eat|earth|" \
-    @"dvr|dvag|durban|dupont|duns|dunlop|duck|dubai|dtv|drive|download|dot|doosan|domains|doha|dog|dodge|" \
-    @"doctor|docs|dnp|diy|dish|discover|discount|directory|direct|digital|diet|diamonds|dhl|dev|design|" \
-    @"desi|dentist|dental|democrat|delta|deloitte|dell|delivery|degree|deals|dealer|deal|dds|dclk|day|" \
-    @"datsun|dating|date|data|dance|dad|dabur|cyou|cymru|cuisinella|csc|cruises|cruise|crs|crown|cricket|" \
-    @"creditunion|creditcard|credit|courses|coupons|coupon|country|corsica|coop|cool|cookingchannel|" \
-    @"cooking|contractors|contact|consulting|construction|condos|comsec|computer|compare|company|community|" \
-    @"commbank|comcast|com|cologne|college|coffee|codes|coach|clubmed|club|cloud|clothing|clinique|clinic|" \
-    @"click|cleaning|claims|cityeats|city|citic|citi|citadel|cisco|circle|cipriani|church|chrysler|chrome|" \
-    @"christmas|chloe|chintai|cheap|chat|chase|channel|chanel|cfd|cfa|cern|ceo|center|ceb|cbs|cbre|cbn|cba|" \
-    @"catholic|catering|cat|casino|cash|caseih|case|casa|cartier|cars|careers|career|care|cards|caravan|" \
-    @"car|capitalone|capital|capetown|canon|cancerresearch|camp|camera|cam|calvinklein|call|cal|cafe|cab|" \
-    @"bzh|buzz|buy|business|builders|build|bugatti|budapest|brussels|brother|broker|broadway|bridgestone|" \
-    @"bradesco|box|boutique|bot|boston|bostik|bosch|boots|booking|book|boo|bond|bom|bofa|boehringer|boats|" \
-    @"bnpparibas|bnl|bmw|bms|blue|bloomberg|blog|blockbuster|blanco|blackfriday|black|biz|bio|bingo|bing|" \
-    @"bike|bid|bible|bharti|bet|bestbuy|best|berlin|bentley|beer|beauty|beats|bcn|bcg|bbva|bbt|bbc|bayern|" \
-    @"bauhaus|basketball|baseball|bargains|barefoot|barclays|barclaycard|barcelona|bar|bank|band|" \
-    @"bananarepublic|banamex|baidu|baby|azure|axa|aws|avianca|autos|auto|author|auspost|audio|audible|audi|" \
-    @"auction|attorney|athleta|associates|asia|asda|arte|art|arpa|army|archi|aramco|arab|aquarelle|apple|" \
-    @"app|apartments|aol|anz|anquan|android|analytics|amsterdam|amica|amfam|amex|americanfamily|" \
-    @"americanexpress|alstom|alsace|ally|allstate|allfinanz|alipay|alibaba|alfaromeo|akdn|airtel|airforce|" \
-    @"airbus|aigo|aig|agency|agakhan|africa|afl|afamilycompany|aetna|aero|aeg|adult|ads|adac|actor|active|" \
-    @"aco|accountants|accountant|accenture|academy|abudhabi|abogado|able|abc|abbvie|abbott|abb|abarth|aarp|" \
-    @"aaa|onion" \
-@")(?=[^a-z0-9@]|$))"
+@"(?:" \
+@"삼성|닷컴|닷넷|香格里拉|餐厅|食品|飞利浦|電訊盈科|集团|通販|购物|谷歌|诺基亚|联通|网络|网站|网店|网址|组织机构|移动|珠宝|点看|游戏|淡马锡|机构|書籍|时尚|新闻|政府|政务|" \
+@"手表|手机|我爱你|慈善|微博|广东|工行|家電|娱乐|天主教|大拿|大众汽车|在线|嘉里大酒店|嘉里|商标|商店|商城|公益|公司|八卦|健康|信息|佛山|企业|中文网|中信|世界|ポイント|" \
+@"ファッション|セール|ストア|コム|グーグル|クラウド|みんな|คอม|संगठन|नेट|कॉम|همراه|موقع|موبايلي|كوم|كاثوليك|شبكة|بيتك|بازار|" \
+@"العليان|ارامكو|ابوظبي|קום|сайт|рус|орг|онлайн|москва|ком|католик|дети|zuerich|zone|zippo|zip|zero|" \
+@"zara|zappos|yun|youtube|you|yokohama|yoga|yodobashi|yandex|yamaxun|yahoo|yachts|xyz|xxx|xperia|xin|" \
+@"xihuan|xfinity|xerox|xbox|wtf|wtc|wow|world|works|work|woodside|wolterskluwer|wme|winners|wine|" \
+@"windows|win|williamhill|wiki|wien|whoswho|weir|weibo|wedding|wed|website|weber|webcam|weatherchannel|" \
+@"weather|watches|watch|warman|wanggou|wang|walter|walmart|wales|vuelos|voyage|voto|voting|vote|volvo|" \
+@"volkswagen|vodka|vlaanderen|vivo|viva|vistaprint|vista|vision|visa|virgin|vip|vin|villas|viking|vig|" \
+@"video|viajes|vet|versicherung|vermögensberatung|vermögensberater|verisign|ventures|vegas|vanguard|" \
+@"vana|vacations|ups|uol|uno|university|unicom|uconnect|ubs|ubank|tvs|tushu|tunes|tui|tube|trv|trust|" \
+@"travelersinsurance|travelers|travelchannel|travel|training|trading|trade|toys|toyota|town|tours|" \
+@"total|toshiba|toray|top|tools|tokyo|today|tmall|tkmaxx|tjx|tjmaxx|tirol|tires|tips|tiffany|tienda|" \
+@"tickets|tiaa|theatre|theater|thd|teva|tennis|temasek|telefonica|telecity|tel|technology|tech|team|" \
+@"tdk|tci|taxi|tax|tattoo|tatar|tatamotors|target|taobao|talk|taipei|tab|systems|symantec|sydney|swiss|" \
+@"swiftcover|swatch|suzuki|surgery|surf|support|supply|supplies|sucks|style|study|studio|stream|store|" \
+@"storage|stockholm|stcgroup|stc|statoil|statefarm|statebank|starhub|star|staples|stada|srt|srl|" \
+@"spreadbetting|spot|spiegel|space|soy|sony|song|solutions|solar|sohu|software|softbank|social|soccer|" \
+@"sncf|smile|smart|sling|skype|sky|skin|ski|site|singles|sina|silk|shriram|showtime|show|shouji|" \
+@"shopping|shop|shoes|shiksha|shia|shell|shaw|sharp|shangrila|sfr|sexy|sex|sew|seven|ses|services|" \
+@"sener|select|seek|security|secure|seat|scot|scor|scjohnson|science|schwarz|schule|school|" \
+@"scholarships|schmidt|schaeffler|scb|sca|sbs|sbi|saxo|save|sas|sarl|sapo|sap|sanofi|sandvikcoromant|" \
+@"sandvik|samsung|samsclub|salon|sale|sakura|safety|safe|saarland|ryukyu|rwe|run|ruhr|rsvp|room|rogers|" \
+@"rodeo|rocks|rocher|rmit|rip|rio|ril|rightathome|ricoh|richardli|rich|rexroth|reviews|review|" \
+@"restaurant|rest|republican|report|repair|rentals|rent|ren|reliance|reit|reisen|reise|rehab|" \
+@"redumbrella|redstone|red|recipes|realty|realtor|realestate|read|raid|radio|racing|qvc|quest|quebec|" \
+@"qpon|pwc|pub|prudential|pru|protection|property|properties|promo|progressive|prof|productions|prod|" \
+@"pro|prime|press|praxi|pramerica|post|porn|politie|poker|pohl|pnc|plus|plumbing|playstation|play|" \
+@"place|pizza|pioneer|pink|ping|pin|pid|pictures|pictet|pics|piaget|physio|photos|photography|photo|" \
+@"phone|philips|pharmacy|pfizer|pet|pccw|pay|passagens|party|parts|partners|pars|paris|panerai|" \
+@"panasonic|pamperedchef|page|ovh|ott|otsuka|osaka|origins|orientexpress|organic|org|orange|oracle|" \
+@"open|ooo|onyourside|online|onl|ong|one|omega|ollo|oldnavy|olayangroup|olayan|okinawa|office|off|" \
+@"observer|obi|nyc|ntt|nrw|nra|nowtv|nowruz|now|norton|northwesternmutual|nokia|nissay|nissan|ninja|" \
+@"nikon|nike|nico|nhk|ngo|nfl|nexus|nextdirect|next|news|newholland|new|neustar|network|netflix|" \
+@"netbank|net|nec|nba|navy|natura|nationwide|name|nagoya|nadex|nab|mutuelle|mutual|museum|mtr|mtpc|mtn|" \
+@"msd|movistar|movie|mov|motorcycles|moto|moscow|mortgage|mormon|mopar|montblanc|monster|money|monash|" \
+@"mom|moi|moe|moda|mobily|mobile|mobi|mma|mls|mlb|mitsubishi|mit|mint|mini|mil|microsoft|miami|metlife|" \
+@"meo|menu|men|memorial|meme|melbourne|meet|media|med|mckinsey|mcdonalds|mcd|mba|mattel|maserati|" \
+@"marshalls|marriott|markets|marketing|market|mango|management|man|makeup|maison|maif|madrid|macys|" \
+@"luxury|luxe|lupin|lundbeck|ltda|ltd|lplfinancial|lpl|love|lotto|lotte|london|lol|loft|locus|locker|" \
+@"loans|loan|lixil|living|live|lipsy|link|linde|lincoln|limo|limited|lilly|like|lighting|lifestyle|" \
+@"lifeinsurance|life|lidl|liaison|lgbt|lexus|lego|legal|lefrak|leclerc|lease|lds|lawyer|law|latrobe|" \
+@"latino|lat|lasalle|lanxess|landrover|land|lancome|lancia|lancaster|lamer|lamborghini|ladbrokes|" \
+@"lacaixa|kyoto|kuokgroup|kred|krd|kpn|kpmg|kosher|komatsu|koeln|kiwi|kitchen|kindle|kinder|kim|kia|" \
+@"kfh|kerryproperties|kerrylogistics|kerryhotels|kddi|kaufen|juniper|juegos|jprs|jpmorgan|joy|jot|" \
+@"joburg|jobs|jnj|jmp|jll|jlc|jio|jewelry|jetzt|jeep|jcp|jcb|java|jaguar|iwc|iveco|itv|itau|istanbul|" \
+@"ist|ismaili|iselect|irish|ipiranga|investments|intuit|international|intel|int|insure|insurance|" \
+@"institute|ink|ing|info|infiniti|industries|immobilien|immo|imdb|imamat|ikano|iinet|ifm|ieee|icu|ice|" \
+@"icbc|ibm|hyundai|hyatt|hughes|htc|hsbc|how|house|hotmail|hoteles|hot|hosting|host|hospital|horse|" \
+@"honeywell|honda|homesense|homes|homegoods|homedepot|holiday|holdings|hockey|hkt|hiv|hitachi|" \
+@"hisamitsu|hiphop|hgtv|hermes|here|helsinki|help|healthcare|health|hdfcbank|hdfc|hbo|haus|hangout|" \
+@"hamburg|hair|guru|guitars|guide|guge|gucci|guardian|group|gripe|green|gratis|graphics|grainger|gov|" \
+@"got|gop|google|goog|goodyear|goodhands|goo|golf|goldpoint|gold|godaddy|gmx|gmo|gmbh|gmail|globo|" \
+@"global|gle|glass|glade|giving|gives|gifts|gift|ggee|george|genting|gent|gea|gdn|gbiz|garden|gap|" \
+@"games|game|gallup|gallo|gallery|gal|fyi|futbol|furniture|fund|fun|fujixerox|fujitsu|ftr|frontier|" \
+@"frontdoor|frogans|frl|fresenius|free|fox|foundation|forum|forsale|forex|ford|football|foodnetwork|" \
+@"food|foo|fly|flsmidth|flowers|florist|flir|flights|flickr|fitness|fit|fishing|fish|firmdale|" \
+@"firestone|fire|financial|finance|final|film|fido|fidelity|fiat|ferrero|ferrari|feedback|fedex|fast|" \
+@"fashion|farmers|farm|fans|fan|family|faith|fairwinds|fail|fage|extraspace|express|exposed|expert|" \
+@"exchange|everbank|events|eus|eurovision|esurance|estate|esq|erni|ericsson|equipment|epson|epost|" \
+@"enterprises|engineering|engineer|energy|emerck|email|education|edu|edeka|eco|eat|earth|dvr|dvag|" \
+@"durban|dupont|duns|dunlop|duck|dubai|dtv|drive|download|dot|doosan|domains|doha|dog|dodge|doctor|" \
+@"docs|dnp|diy|dish|discover|discount|directory|direct|digital|diet|diamonds|dhl|dev|design|desi|" \
+@"dentist|dental|democrat|delta|deloitte|dell|delivery|degree|deals|dealer|deal|dds|dclk|day|datsun|" \
+@"dating|date|data|dance|dad|dabur|cyou|cymru|cuisinella|csc|cruises|cruise|crs|crown|cricket|" \
+@"creditunion|creditcard|credit|courses|coupons|coupon|country|corsica|coop|cool|cookingchannel|" \
+@"cooking|contractors|contact|consulting|construction|condos|comsec|computer|compare|company|community|" \
+@"commbank|comcast|com|cologne|college|coffee|codes|coach|clubmed|club|cloud|clothing|clinique|clinic|" \
+@"click|cleaning|claims|cityeats|city|citic|citi|citadel|cisco|circle|cipriani|church|chrysler|chrome|" \
+@"christmas|chloe|chintai|cheap|chat|chase|channel|chanel|cfd|cfa|cern|ceo|center|ceb|cbs|cbre|cbn|cba|" \
+@"catholic|catering|cat|casino|cash|caseih|case|casa|cartier|cars|careers|career|care|cards|caravan|" \
+@"car|capitalone|capital|capetown|canon|cancerresearch|camp|camera|cam|calvinklein|call|cal|cafe|cab|" \
+@"bzh|buzz|buy|business|builders|build|bugatti|budapest|brussels|brother|broker|broadway|bridgestone|" \
+@"bradesco|box|boutique|bot|boston|bostik|bosch|boots|booking|book|boo|bond|bom|bofa|boehringer|boats|" \
+@"bnpparibas|bnl|bmw|bms|blue|bloomberg|blog|blockbuster|blanco|blackfriday|black|biz|bio|bingo|bing|" \
+@"bike|bid|bible|bharti|bet|bestbuy|best|berlin|bentley|beer|beauty|beats|bcn|bcg|bbva|bbt|bbc|bayern|" \
+@"bauhaus|basketball|baseball|bargains|barefoot|barclays|barclaycard|barcelona|bar|bank|band|" \
+@"bananarepublic|banamex|baidu|baby|azure|axa|aws|avianca|autos|auto|author|auspost|audio|audible|audi|" \
+@"auction|attorney|athleta|associates|asia|asda|arte|art|arpa|army|archi|aramco|aquarelle|apple|app|" \
+@"apartments|aol|anz|anquan|android|analytics|amsterdam|amica|amfam|amex|americanfamily|" \
+@"americanexpress|alstom|alsace|ally|allstate|allfinanz|alipay|alibaba|alfaromeo|akdn|airtel|airforce|" \
+@"airbus|aigo|aig|agency|agakhan|afl|afamilycompany|aetna|aero|aeg|adult|ads|adac|actor|active|aco|" \
+@"accountants|accountant|accenture|academy|abudhabi|abogado|able|abc|abbvie|abbott|abb|abarth|aarp|aaa|" \
+@"onion" \
+@")"
 
 #define TWUValidCCTLD \
-@"(?:(?:" \
-    @"한국|香港|澳門|新加坡|台灣|台湾|中國|中国|გე|ไทย|ලංකා|ഭാരതം|ಭಾರತ|భారత్|சிங்கப்பூர்|இலங்கை|இந்தியா|ଭାରତ|ભારત|ਭਾਰਤ|ভাৰত|" \
-    @"ভারত|বাংলা|भारोत|भारतम्|भारत|ڀارت|پاکستان|مليسيا|مصر|قطر|فلسطين|عمان|عراق|سورية|سودان|تونس|بھارت|" \
-    @"بارت|ایران|امارات|المغرب|السعودية|الجزائر|الاردن|հայ|қаз|укр|срб|рф|мон|мкд|ею|бел|бг|ελ|zw|zm|za|yt|" \
-    @"ye|ws|wf|vu|vn|vi|vg|ve|vc|va|uz|uy|us|um|uk|ug|ua|tz|tw|tv|tt|tr|tp|to|tn|tm|tl|tk|tj|th|tg|tf|td|" \
-    @"tc|sz|sy|sx|sv|su|st|ss|sr|so|sn|sm|sl|sk|sj|si|sh|sg|se|sd|sc|sb|sa|rw|ru|rs|ro|re|qa|py|pw|pt|ps|" \
-    @"pr|pn|pm|pl|pk|ph|pg|pf|pe|pa|om|nz|nu|nr|np|no|nl|ni|ng|nf|ne|nc|na|mz|my|mx|mw|mv|mu|mt|ms|mr|mq|" \
-    @"mp|mo|mn|mm|ml|mk|mh|mg|mf|me|md|mc|ma|ly|lv|lu|lt|ls|lr|lk|li|lc|lb|la|kz|ky|kw|kr|kp|kn|km|ki|kh|" \
-    @"kg|ke|jp|jo|jm|je|it|is|ir|iq|io|in|im|il|ie|id|hu|ht|hr|hn|hm|hk|gy|gw|gu|gt|gs|gr|gq|gp|gn|gm|gl|" \
-    @"gi|gh|gg|gf|ge|gd|gb|ga|fr|fo|fm|fk|fj|fi|eu|et|es|er|eh|eg|ee|ec|dz|do|dm|dk|dj|de|cz|cy|cx|cw|cv|" \
-    @"cu|cr|co|cn|cm|cl|ck|ci|ch|cg|cf|cd|cc|ca|bz|by|bw|bv|bt|bs|br|bq|bo|bn|bm|bl|bj|bi|bh|bg|bf|be|bd|" \
-    @"bb|ba|az|ax|aw|au|at|as|ar|aq|ao|an|am|al|ai|ag|af|ae|ad|ac" \
-@")(?=[^a-z0-9@]|$))"
+@"(?:" \
+@"한국|香港|澳門|新加坡|台灣|台湾|中國|中国|გე|ไทย|ලංකා|ഭാരതം|ಭಾರತ|భారత్|சிங்கப்பூர்|இலங்கை|இந்தியா|ଭାରତ|ભારત|ਭਾਰਤ|ভাৰত|" \
+@"ভারত|বাংলা|भारोत|भारतम्|भारत|ڀارت|پاکستان|مليسيا|مصر|قطر|فلسطين|عمان|عراق|سورية|سودان|تونس|بھارت|" \
+@"بارت|ایران|امارات|المغرب|السعودية|الجزائر|الاردن|հայ|қаз|укр|срб|рф|мон|мкд|ею|бел|бг|ελ|zw|zm|za|yt|" \
+@"ye|ws|wf|vu|vn|vi|vg|ve|vc|va|uz|uy|us|um|uk|ug|ua|tz|tw|tv|tt|tr|tp|to|tn|tm|tl|tk|tj|th|tg|tf|td|" \
+@"tc|sz|sy|sx|sv|su|st|ss|sr|so|sn|sm|sl|sk|sj|si|sh|sg|se|sd|sc|sb|sa|rw|ru|rs|ro|re|qa|py|pw|pt|ps|" \
+@"pr|pn|pm|pl|pk|ph|pg|pf|pe|pa|om|nz|nu|nr|np|no|nl|ni|ng|nf|ne|nc|na|mz|my|mx|mw|mv|mu|mt|ms|mr|mq|" \
+@"mp|mo|mn|mm|ml|mk|mh|mg|mf|me|md|mc|ma|ly|lv|lu|lt|ls|lr|lk|li|lc|lb|la|kz|ky|kw|kr|kp|kn|km|ki|kh|" \
+@"kg|ke|jp|jo|jm|je|it|is|ir|iq|io|in|im|il|ie|id|hu|ht|hr|hn|hm|hk|gy|gw|gu|gt|gs|gr|gq|gp|gn|gm|gl|" \
+@"gi|gh|gg|gf|ge|gd|gb|ga|fr|fo|fm|fk|fj|fi|eu|et|es|er|eh|eg|ee|ec|dz|do|dm|dk|dj|de|cz|cy|cx|cw|cv|" \
+@"cu|cr|co|cn|cm|cl|ck|ci|ch|cg|cf|cd|cc|ca|bz|by|bw|bv|bt|bs|br|bq|bo|bn|bm|bl|bj|bi|bh|bg|bf|be|bd|" \
+@"bb|ba|az|ax|aw|au|at|as|ar|aq|ao|an|am|al|ai|ag|af|ae|ad|ac" \
+@")"
 
-#define TWUValidTCOURL                  @"^https?://t\\.co/([a-z0-9]+)"
+#define TWUValidPunycode                @"(?:xn--[0-9a-z]+)"
+
+#define TWUValidSpecialCCTLD \
+@"(?:" \
+@"co|tv" \
+@")"
+
+#define TWUSimplifiedValidTLDChars      TWUDomainValidStartEndChars
+#define TWUSimplifiedValidTLD           TWUSimplifiedValidTLDChars @"{2,}"
+
+#define TWUSimplifiedValidDomain \
+@"(?:" \
+TWUValidSubdomain @"*" TWUValidDomainName TWUSimplifiedValidTLD \
+@")"
+
+#define TWUURLDomainForValidation \
+@"\\A(?:" \
+TWUValidSubdomain @"*" TWUValidDomainName \
+@"(?:" TWUValidGTLD @"|" TWUValidCCTLD @"|" TWUValidPunycode @")" \
+@")\\z"
+
+#define TWUValidASCIIDomain \
+@"(?:[a-zA-Z0-9][a-zA-Z0-9\\-_" TWULatinAccents @"]*\\.)+" \
+@"(?:" TWUValidGTLD @"|" TWUValidCCTLD @"|" TWUValidPunycode @")(?=[^0-9a-z@]|$)"
+
+#define TWUValidTCOURL                  @"^https?://t\\.co/[a-zA-Z0-9]+"
+#define TWUInvalidShortDomain           @"\\A" TWUValidDomainName TWUValidCCTLD @"\\z"
+#define TWUValidSpecialShortDomain      @"\\A" TWUValidDomainName TWUValidSpecialCCTLD @"\\z"
+
+#define TWUValidPortNumber              @"[0-9]+"
+#define TWUValidGeneralURLPathChars     @"[a-zA-Z\\p{Cyrillic}0-9!\\*';:=+,.$/%#\\[\\]\\-_~&|@" TWULatinAccents @"]"
+
+#define TWUValidURLBalancedParens \
+@"\\(" \
+@"(?:" \
+TWUValidGeneralURLPathChars @"+" \
+@"|" \
+@"(?:" \
+@"\\(" \
+TWUValidGeneralURLPathChars @"+" \
+@"\\)" \
+@")" \
+@")" \
+@"\\)"
+
+#define TWUValidURLPathEndingChars      @"[a-zA-Z\\p{Cyrillic}0-9=_#/+\\-" TWULatinAccents @"]|(?:" TWUValidURLBalancedParens @")"
 
 #define TWUValidURLPath \
 @"(?:" \
-    @"(?:" \
-        TWUValidGeneralURLPathChars @"*" \
-        @"(?:" TWUValidURLBalancedParens TWUValidGeneralURLPathChars @"*)*" TWUValidURLPathEndingChars \
-    @")" \
-    @"|" \
-    @"(?:" TWUValidGeneralURLPathChars @"+/)" \
+@"(?:" \
+TWUValidGeneralURLPathChars @"*" \
+@"(?:" TWUValidURLBalancedParens TWUValidGeneralURLPathChars @"*)*" TWUValidURLPathEndingChars \
+@")" \
+@"|" \
+@"(?:" TWUValidGeneralURLPathChars @"+/)" \
+@")"
+
+#define TWUValidURLQueryChars           @"[a-zA-Z0-9!?*'\\(\\);:&=+$/%#\\[\\]\\-_\\.,~|@]"
+#define TWUValidURLQueryEndingChars     @"[a-zA-Z0-9_&=#/]"
+
+#define TWUSimplifiedValidURL \
+@"(" \
+@"(" TWUValidURLPrecedingChars @")" \
+@"(" \
+@"(https?://)?" \
+@"(" TWUSimplifiedValidDomain @")" \
+@"(?::(" TWUValidPortNumber @"))?" \
+@"(/" TWUValidURLPath @"*)?" \
+@"(\\?" TWUValidURLQueryChars @"*" TWUValidURLQueryEndingChars @")?" \
+@")" \
 @")"
 
 #pragma mark - Constants
 
-// This matches the maximum length of an URL allowed by Twitter's backend.
-static const NSInteger kMaxURLLength = 4096;
-static const NSInteger kMaxTCOSlugLength = 40;
-static const NSInteger kMaxTweetLengthLegacy = 140;
-static const NSInteger kTransformedURLLength = 23;
-static const NSInteger kPermillageScaleFactor = 1000;
-
-// The backend adds http:// for normal links and https to *.twitter.com URLs
-// (it also rewrites http to https for URLs matching *.twitter.com).
-// We always add https://. By making the assumption that kURLProtocolLength
-// is https, the trade off is we'll disallow a http URL that is 4096 characters.
-static const NSInteger kURLProtocolLength = 8; // length of @"https://"
-
-typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* text, TwitterTextEntity *entity, NSString *substring);
+static const NSUInteger MaxTweetLength = 140;
+static const NSUInteger HTTPShortURLLength = 50;
+static const NSUInteger HTTPSShortURLLength = 50;
 
 @implementation TwitterText
 
 #pragma mark - Public Methods
 
-+ (NSArray<TwitterTextEntity *> *)entitiesInText:(NSString *)text
++ (NSArray *)entitiesInText:(NSString *)text
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
-
-    NSArray<TwitterTextEntity *> *urls = [self URLsInText:text];
+    
+    NSMutableArray *results = [NSMutableArray array];
+    
+    NSArray *urls = [self URLsInText:text];
     [results addObjectsFromArray:urls];
-
-    NSArray<TwitterTextEntity *> *hashtags = [self hashtagsInText:text withURLEntities:urls];
+    
+    NSArray *hashtags = [self hashtagsInText:text withURLEntities:urls];
     [results addObjectsFromArray:hashtags];
-
-    NSArray<TwitterTextEntity *> *symbols = [self symbolsInText:text withURLEntities:urls];
+    
+    NSArray *symbols = [self symbolsInText:text withURLEntities:urls];
     [results addObjectsFromArray:symbols];
-
-    NSArray<TwitterTextEntity *> *mentionsAndLists = [self mentionsOrListsInText:text];
-    NSMutableArray<TwitterTextEntity *> *addingItems = [NSMutableArray<TwitterTextEntity *> array];
-
+    
+    NSArray *mentionsAndLists = [self mentionsOrListsInText:text];
+    NSMutableArray *addingItems = [NSMutableArray array];
+    
     for (TwitterTextEntity *entity in mentionsAndLists) {
         NSRange entityRange = entity.range;
         BOOL found = NO;
@@ -370,118 +361,146 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
             [addingItems addObject:entity];
         }
     }
-
+    
     [results addObjectsFromArray:addingItems];
     [results sortUsingSelector:@selector(compare:)];
-
+    
     return results;
 }
 
-+ (NSArray<TwitterTextEntity *> *)URLsInText:(NSString *)text
++ (NSArray *)URLsInText:(NSString *)text
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+    
+    NSMutableArray *results = [NSMutableArray array];
     NSUInteger len = text.length;
     NSUInteger position = 0;
     NSRange allRange = NSMakeRange(0, 0);
-
+    
     while (1) {
         position = NSMaxRange(allRange);
         if (len <= position) {
             break;
         }
-
-        NSTextCheckingResult *urlResult = [[self validURLRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
-        if (!urlResult) {
+        
+        NSTextCheckingResult *urlResult = [[self simplifiedValidURLRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
+        if (!urlResult || urlResult.numberOfRanges < 9) {
             break;
         }
-
+        
         allRange = urlResult.range;
-        if (urlResult.numberOfRanges < 9) {
-            // Continue processing after the end of this invalid result.
-            continue;
-        }
-
-        NSRange urlRange = [urlResult rangeAtIndex:TWUValidURLGroupURL];
-        NSRange precedingRange = [urlResult rangeAtIndex:TWUValidURLGroupPreceding];
-        NSRange protocolRange = [urlResult rangeAtIndex:TWUValidURLGroupProtocol];
-        NSRange domainRange = [urlResult rangeAtIndex:TWUValidURLGroupDomain];
-
-        NSString *protocol = (protocolRange.location != NSNotFound) ? [text substringWithRange:protocolRange] : nil;
-        if (protocol.length == 0) {
-            NSString *preceding = (precedingRange.location != NSNotFound) ? [text substringWithRange:precedingRange] : nil;
-            NSRange suffixRange = [preceding rangeOfCharacterFromSet:[self invalidURLWithoutProtocolPrecedingCharSet] options:NSBackwardsSearch | NSAnchoredSearch];
-            if (suffixRange.location != NSNotFound) {
+        NSRange precedingRange = [urlResult rangeAtIndex:2];
+        NSRange urlRange = [urlResult rangeAtIndex:3];
+        NSRange protocolRange = [urlResult rangeAtIndex:4];
+        NSRange domainRange = [urlResult rangeAtIndex:5];
+        NSRange pathRange = [urlResult rangeAtIndex:7];
+        
+        // If protocol is missing and domain contains non-ASCII characters,
+        // extract ASCII-only domains.
+        if (protocolRange.location == NSNotFound) {
+            if (precedingRange.location != NSNotFound && precedingRange.length > 0) {
+                NSString *preceding = [text substringWithRange:precedingRange];
+                NSRange suffixRange = [preceding rangeOfCharacterFromSet:[self invalidURLWithoutProtocolPrecedingCharSet] options:NSBackwardsSearch | NSAnchoredSearch];
+                if (suffixRange.location != NSNotFound) {
+                    continue;
+                }
+            }
+            
+            NSUInteger domainStart = domainRange.location;
+            NSUInteger domainEnd = NSMaxRange(domainRange);
+            TwitterTextEntity *lastEntity = nil;
+            
+            while (domainStart < domainEnd) {
+                // Include succeeding character for validation
+                NSUInteger checkingDomainLength = domainEnd - domainStart;
+                if (domainStart + checkingDomainLength < len) {
+                    checkingDomainLength++;
+                }
+                NSTextCheckingResult *asciiResult = [[self validASCIIDomainRegexp] firstMatchInString:text options:0 range:NSMakeRange(domainStart, checkingDomainLength)];
+                if (!asciiResult) {
+                    break;
+                }
+                
+                urlRange = asciiResult.range;
+                lastEntity = [TwitterTextEntity entityWithType:TwitterTextEntityURL range:urlRange];
+                
+                NSTextCheckingResult *invalidShortResult = [[self invalidShortDomainRegexp] firstMatchInString:text options:0 range:urlRange];
+                NSTextCheckingResult *validSpecialShortResult = [[self validSpecialShortDomainRegexp] firstMatchInString:text options:0 range:urlRange];
+                if (pathRange.location != NSNotFound || validSpecialShortResult != nil || invalidShortResult == nil) {
+                    [results addObject:lastEntity];
+                }
+                
+                domainStart = NSMaxRange(urlRange);
+            }
+            
+            if (!lastEntity) {
                 continue;
             }
-        }
-
-        NSString *url = (urlRange.location != NSNotFound) ? [text substringWithRange:urlRange] : nil;
-        NSString *host = (domainRange.location != NSNotFound) ? [text substringWithRange:domainRange] : nil;
-
-        NSInteger start = urlRange.location;
-        NSInteger end = NSMaxRange(urlRange);
-
-        NSTextCheckingResult *tcoResult = url ? [[self validTCOURLRegexp] firstMatchInString:url options:0 range:NSMakeRange(0, url.length)] : nil;
-        if (tcoResult && tcoResult.numberOfRanges >= 2) {
-            NSRange tcoRange = [tcoResult rangeAtIndex:0];
-            NSRange tcoUrlSlugRange = [tcoResult rangeAtIndex:1];
-            if (tcoRange.location == NSNotFound || tcoUrlSlugRange.location == NSNotFound) {
-                continue;
+            
+            if (pathRange.location != NSNotFound && NSMaxRange(lastEntity.range) == pathRange.location) {
+                NSRange entityRange = lastEntity.range;
+                entityRange.length += pathRange.length;
+                lastEntity.range = entityRange;
             }
-            NSString *tcoUrlSlug = [text substringWithRange:tcoUrlSlugRange];
-            // In the case of t.co URLs, don't allow additional path characters and ensure that the slug is under 40 chars.
-            if ([tcoUrlSlug length] > kMaxTCOSlugLength) {
-                continue;
+            
+            // Adjust next position
+            allRange = lastEntity.range;
+            
+        } else {
+            // In the case of t.co URLs, don't allow additional path characters
+            NSRange tcoRange = [[self validTCOURLRegexp] rangeOfFirstMatchInString:text options:0 range:urlRange];
+            if (tcoRange.location != NSNotFound) {
+                urlRange.length = tcoRange.length;
             } else {
-                url = [url substringWithRange:tcoRange];
-                end = start + url.length;
+                // Validate domain with precise pattern
+                NSRange validationResult = [[self URLRegexpForValidation] rangeOfFirstMatchInString:text options:0 range:domainRange];
+                if (validationResult.location == NSNotFound) {
+                    continue;
+                }
             }
-        }
-        if ([self isValidHostAndLength:url.length protocol:protocol host:host]) {
-            TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntityURL range:NSMakeRange(start, end - start)];
+            
+            TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntityURL range:urlRange];
             [results addObject:entity];
-            allRange = entity.range;
         }
     }
+    
     return results;
 }
 
-+ (NSArray<TwitterTextEntity *> *)hashtagsInText:(NSString *)text checkingURLOverlap:(BOOL)checkingURLOverlap
++ (NSArray *)hashtagsInText:(NSString *)text checkingURLOverlap:(BOOL)checkingURLOverlap
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSArray<TwitterTextEntity *> *urls = nil;
+    
+    NSArray *urls = nil;
     if (checkingURLOverlap) {
         urls = [self URLsInText:text];
     }
     return [self hashtagsInText:text withURLEntities:urls];
 }
 
-+ (NSArray<TwitterTextEntity *> *)hashtagsInText:(NSString *)text withURLEntities:(NSArray<TwitterTextEntity *> *)urlEntities
++ (NSArray *)hashtagsInText:(NSString *)text withURLEntities:(NSArray *)urlEntities
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+    
+    NSMutableArray *results = [NSMutableArray array];
     NSUInteger len = text.length;
     NSUInteger position = 0;
-
+    
     while (1) {
         NSTextCheckingResult *matchResult = [[self validHashtagRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
         if (!matchResult || matchResult.numberOfRanges < 2) {
             break;
         }
-
+        
         NSRange hashtagRange = [matchResult rangeAtIndex:1];
         BOOL matchOk = YES;
-
+        
         // Check URL overlap
         for (TwitterTextEntity *urlEntity in urlEntities) {
             if (NSIntersectionRange(urlEntity.range, hashtagRange).length > 0) {
@@ -489,7 +508,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
                 break;
             }
         }
-
+        
         if (matchOk) {
             NSUInteger afterStart = NSMaxRange(hashtagRange);
             if (afterStart < len) {
@@ -498,51 +517,51 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
                     matchOk = NO;
                 }
             }
-
+            
             if (matchOk) {
                 TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntityHashtag range:hashtagRange];
                 [results addObject:entity];
             }
         }
-
+        
         position = NSMaxRange(matchResult.range);
     }
-
+    
     return results;
 }
 
-+ (NSArray<TwitterTextEntity *> *)symbolsInText:(NSString *)text checkingURLOverlap:(BOOL)checkingURLOverlap
++ (NSArray *)symbolsInText:(NSString *)text checkingURLOverlap:(BOOL)checkingURLOverlap
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSArray<TwitterTextEntity *> *urls = nil;
+    
+    NSArray *urls = nil;
     if (checkingURLOverlap) {
         urls = [self URLsInText:text];
     }
     return [self symbolsInText:text withURLEntities:urls];
 }
 
-+ (NSArray<TwitterTextEntity *> *)symbolsInText:(NSString *)text withURLEntities:(NSArray<TwitterTextEntity *> *)urlEntities
++ (NSArray *)symbolsInText:(NSString *)text withURLEntities:(NSArray *)urlEntities
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+    
+    NSMutableArray *results = [NSMutableArray array];
     NSUInteger len = text.length;
     NSUInteger position = 0;
-
+    
     while (1) {
         NSTextCheckingResult *matchResult = [[self validSymbolRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
         if (!matchResult || matchResult.numberOfRanges < 2) {
             break;
         }
-
+        
         NSRange symbolRange = [matchResult rangeAtIndex:1];
         BOOL matchOk = YES;
-
+        
         // Check URL overlap
         for (TwitterTextEntity *urlEntity in urlEntities) {
             if (NSIntersectionRange(urlEntity.range, symbolRange).length > 0) {
@@ -550,61 +569,61 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
                 break;
             }
         }
-
+        
         if (matchOk) {
             TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntitySymbol range:symbolRange];
             [results addObject:entity];
         }
-
+        
         position = NSMaxRange(matchResult.range);
     }
-
+    
     return results;
 }
 
-+ (NSArray<TwitterTextEntity *> *)mentionedScreenNamesInText:(NSString *)text
++ (NSArray *)mentionedScreenNamesInText:(NSString *)text
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSArray<TwitterTextEntity *> *mentionsOrLists = [self mentionsOrListsInText:text];
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
-
+    
+    NSArray *mentionsOrLists = [self mentionsOrListsInText:text];
+    NSMutableArray *results = [NSMutableArray array];
+    
     for (TwitterTextEntity *entity in mentionsOrLists) {
         if (entity.type == TwitterTextEntityScreenName) {
             [results addObject:entity];
         }
     }
-
+    
     return results;
 }
 
-+ (NSArray<TwitterTextEntity *> *)mentionsOrListsInText:(NSString *)text
++ (NSArray *)mentionsOrListsInText:(NSString *)text
 {
     if (!text.length) {
-        return @[];
+        return [NSArray array];
     }
-
-    NSMutableArray<TwitterTextEntity *> *results = [NSMutableArray<TwitterTextEntity *> array];
+    
+    NSMutableArray *results = [NSMutableArray array];
     NSUInteger len = text.length;
     NSUInteger position = 0;
-
+    
     while (1) {
         NSTextCheckingResult *matchResult = [[self validMentionOrListRegexp] firstMatchInString:text options:NSMatchingWithoutAnchoringBounds range:NSMakeRange(position, len - position)];
         if (!matchResult || matchResult.numberOfRanges < 5) {
             break;
         }
-
+        
         NSRange allRange = matchResult.range;
         NSUInteger end = NSMaxRange(allRange);
-
+        
         NSRange endMentionRange = [[self endMentionRegexp] rangeOfFirstMatchInString:text options:0 range:NSMakeRange(end, len - end)];
         if (endMentionRange.location == NSNotFound) {
             NSRange atSignRange = [matchResult rangeAtIndex:2];
             NSRange screenNameRange = [matchResult rangeAtIndex:3];
             NSRange listNameRange = [matchResult rangeAtIndex:4];
-
+            
             if (listNameRange.location == NSNotFound) {
                 TwitterTextEntity *entity = [TwitterTextEntity entityWithType:TwitterTextEntityScreenName range:NSMakeRange(atSignRange.location, NSMaxRange(screenNameRange) - atSignRange.location)];
                 [results addObject:entity];
@@ -616,10 +635,10 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
             // Avoid matching the second username in @username@username
             end++;
         }
-
+        
         position = end;
     }
-
+    
     return results;
 }
 
@@ -628,80 +647,89 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     if (!text.length) {
         return nil;
     }
-
+    
     NSUInteger len = text.length;
-
+    
     NSTextCheckingResult *matchResult = [[self validReplyRegexp] firstMatchInString:text options:(NSMatchingWithoutAnchoringBounds | NSMatchingAnchored) range:NSMakeRange(0, len)];
     if (!matchResult || matchResult.numberOfRanges < 2) {
         return nil;
     }
-
+    
     NSRange replyRange = [matchResult rangeAtIndex:1];
     NSUInteger replyEnd = NSMaxRange(replyRange);
-
+    
     NSRange endMentionRange = [[self endMentionRegexp] rangeOfFirstMatchInString:text options:0 range:NSMakeRange(replyEnd, len - replyEnd)];
     if (endMentionRange.location != NSNotFound) {
         return nil;
     }
-
+    
     return [TwitterTextEntity entityWithType:TwitterTextEntityScreenName range:replyRange];
+}
+
++ (NSUInteger)tweetLength:(NSString *)text
+{
+    return [self tweetLength:text httpURLLength:HTTPShortURLLength httpsURLLength:HTTPSShortURLLength];
+}
+
+static NSCharacterSet *validHashtagBoundaryCharacterSet()
+{
+    // Generate equivalent character set matched by TWUHashtagBoundaryInvalidChars regex and invert
+    NSMutableCharacterSet *set = [NSMutableCharacterSet letterCharacterSet];
+    [set formUnionWithCharacterSet:[NSCharacterSet decimalDigitCharacterSet]];
+    [set formUnionWithCharacterSet:[NSCharacterSet characterSetWithCharactersInString: TWHashtagSpecialChars @"&"]];
+    return [set invertedSet];
 }
 
 + (NSCharacterSet *)validHashtagBoundaryCharacterSet
 {
-    static NSCharacterSet *charset;
+    static NSCharacterSet *charSet = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // Generate equivalent character set matched by TWUHashtagBoundaryInvalidChars regex and invert
-        NSMutableCharacterSet *set = [NSMutableCharacterSet letterCharacterSet];
-        [set formUnionWithCharacterSet:[NSCharacterSet decimalDigitCharacterSet]];
-        [set formUnionWithCharacterSet:[NSCharacterSet characterSetWithCharactersInString: TWHashtagSpecialChars @"&"]];
-        charset = [set invertedSet];
+        charSet = validHashtagBoundaryCharacterSet();
+#if !__has_feature(objc_arc)
+        [charSet retain];
+#endif
     });
-    return charset;
+    return charSet;
 }
 
-+ (NSInteger)tweetLength:(NSString *)text
-{
-    return [self tweetLength:text transformedURLLength:kTransformedURLLength];
-}
-
-+ (NSInteger)tweetLength:(NSString *)text httpURLLength:(NSInteger)httpURLLength httpsURLLength:(NSInteger)httpsURLLength
-{
-    // Deprecated, here for backwards compatibility. Just uses the httpsURLLength, which has been the same as httpURLLength
-    // for some time.
-    return [self tweetLength:text transformedURLLength:httpsURLLength];
-}
-
-+ (NSInteger)tweetLength:(NSString *)text transformedURLLength:(NSInteger)transformedURLLength
++ (NSUInteger)tweetLength:(NSString *)text httpURLLength:(NSUInteger)httpURLLength httpsURLLength:(NSUInteger)httpsURLLength
 {
     // Use Unicode Normalization Form Canonical Composition to calculate tweet text length
     text = [text precomposedStringWithCanonicalMapping];
-
+    
     if (!text.length) {
         return 0;
     }
-
+    
     // Remove URLs from text and add t.co length
     NSMutableString *string = [text mutableCopy];
-
+#if !__has_feature(objc_arc)
+    [string autorelease];
+#endif
+    
     NSUInteger urlLengthOffset = 0;
-    NSArray<TwitterTextEntity *> *urlEntities = [self URLsInText:text];
+    NSArray *urlEntities = [self URLsInText:text];
     for (NSInteger i = (NSInteger)urlEntities.count - 1; i >= 0; i--) {
         TwitterTextEntity *entity = [urlEntities objectAtIndex:(NSUInteger)i];
         NSRange urlRange = entity.range;
-        urlLengthOffset += transformedURLLength;
+        NSString *url = [string substringWithRange:urlRange];
+        if ([url rangeOfString:@"https" options:(NSCaseInsensitiveSearch | NSAnchoredSearch)].location == 0) {
+            urlLengthOffset += httpsURLLength;
+        } else {
+            urlLengthOffset += httpURLLength;
+        }
         [string deleteCharactersInRange:urlRange];
     }
-
+    
     NSUInteger len = string.length;
     NSUInteger charCount = len + urlLengthOffset;
-
+    
     // Adjust count for surrogate pair characters
     if (len > 0) {
         UniChar buffer[len];
         [string getCharacters:buffer range:NSMakeRange(0, len)];
-
+        
         for (NSUInteger i = 0; i < len; i++) {
             UniChar c = buffer[i];
             if (CFStringIsSurrogateHighCharacter(c)) {
@@ -715,68 +743,73 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
             }
         }
     }
-
-    return (NSInteger)charCount;
+    
+    return charCount;
 }
 
 + (NSInteger)remainingCharacterCount:(NSString *)text
 {
-    return [self remainingCharacterCount:text transformedURLLength:kTransformedURLLength];
+    return [self remainingCharacterCount:text httpURLLength:HTTPShortURLLength httpsURLLength:HTTPSShortURLLength];
 }
 
-+ (NSInteger)remainingCharacterCount:(NSString *)text transformedURLLength:(NSInteger)transformedURLLength
++ (NSInteger)remainingCharacterCount:(NSString *)text httpURLLength:(NSUInteger)httpURLLength httpsURLLength:(NSUInteger)httpsURLLength
 {
-    return kMaxTweetLengthLegacy - [self tweetLength:text transformedURLLength:transformedURLLength];
-}
-
-+ (NSInteger)remainingCharacterCount:(NSString *)text httpURLLength:(NSInteger)httpURLLength httpsURLLength:(NSInteger)httpsURLLength
-{
-    return kMaxTweetLengthLegacy - [self tweetLength:text httpURLLength:httpURLLength httpsURLLength:httpsURLLength];
+    return (NSInteger)MaxTweetLength - (NSInteger)[self tweetLength:text httpURLLength:httpURLLength httpsURLLength:httpsURLLength];
 }
 
 #pragma mark - Private Methods
 
-+ (NSRegularExpression *)validGTLDRegexp
++ (NSRegularExpression*)simplifiedValidURLRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidGTLD options:NSRegularExpressionCaseInsensitive error:NULL];
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUSimplifiedValidURL options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
 }
 
-+ (NSRegularExpression *)validURLRegexp
++ (NSRegularExpression*)URLRegexpForValidation
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidURLPatternString options:NSRegularExpressionCaseInsensitive error:NULL];
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUURLDomainForValidation options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
 }
 
-+ (NSRegularExpression *)validDomainRegexp
++ (NSRegularExpression*)validASCIIDomainRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidDomain options:NSRegularExpressionCaseInsensitive error:NULL];
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidASCIIDomain options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
 }
 
-+ (NSRegularExpression *)invalidCharacterRegexp
++ (NSRegularExpression*)invalidShortDomainRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        regexp = [[NSRegularExpression alloc] initWithPattern:TWUInvalidCharactersPattern options:NSRegularExpressionCaseInsensitive error:NULL];
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUInvalidShortDomain options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
 }
 
-+ (NSRegularExpression *)validTCOURLRegexp
++ (NSRegularExpression*)validSpecialShortDomainRegexp
+{
+    static NSRegularExpression *regexp;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        regexp = [[NSRegularExpression alloc] initWithPattern:TWUValidSpecialShortDomain options:NSRegularExpressionCaseInsensitive error:NULL];
+    });
+    return regexp;
+}
+
++ (NSRegularExpression*)validTCOURLRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -786,7 +819,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)validHashtagRegexp
++ (NSRegularExpression*)validHashtagRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -796,7 +829,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)endHashtagRegexp
++ (NSRegularExpression*)endHashtagRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -806,7 +839,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)validSymbolRegexp
++ (NSRegularExpression*)validSymbolRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -816,7 +849,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)validMentionOrListRegexp
++ (NSRegularExpression*)validMentionOrListRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -826,7 +859,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)validReplyRegexp
++ (NSRegularExpression*)validReplyRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -836,7 +869,7 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSRegularExpression *)endMentionRegexp
++ (NSRegularExpression*)endMentionRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -846,17 +879,20 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
     return regexp;
 }
 
-+ (NSCharacterSet *)invalidURLWithoutProtocolPrecedingCharSet
++ (NSCharacterSet*)invalidURLWithoutProtocolPrecedingCharSet
 {
-    static NSCharacterSet *charset;
+    static NSCharacterSet *charSet;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        charset = [NSCharacterSet characterSetWithCharactersInString:@"-_./"];
+        charSet = [NSCharacterSet characterSetWithCharactersInString:@"-_./"];
+#if !__has_feature(objc_arc)
+        [charSet retain];
+#endif
     });
-    return charset;
+    return charSet;
 }
 
-+ (NSRegularExpression *)validDomainSucceedingCharRegexp
++ (NSRegularExpression*)validDomainSucceedingCharRegexp
 {
     static NSRegularExpression *regexp;
     static dispatch_once_t onceToken;
@@ -864,348 +900,6 @@ typedef NSInteger (^TextUnitCounterBlock)(NSInteger currentLength, NSString* tex
         regexp = [[NSRegularExpression alloc] initWithPattern:TWUEndMentionMatch options:NSRegularExpressionCaseInsensitive error:NULL];
     });
     return regexp;
-}
-
-+ (BOOL)isValidHostAndLength:(NSUInteger)urlLength protocol:(NSString *)protocol host:(NSString *)host
-{
-    if (!host) {
-        return NO;
-    }
-
-    NSError *error;
-    NSInteger originalHostLength = [host length];
-
-    NSURL *url = [NSURL URLWithUnicodeString:host error:&error];
-    if (error) {
-        if (error.code == IFUnicodeURLConvertErrorInvalidDNSLength) {
-            // If the error is specifically IFUnicodeURLConvertErrorInvalidDNSLength,
-            // just return a false result. NSURL will happily create a URL for a host
-            // with labels > 63 characters (radar 35802213).
-            return NO;
-        } else {
-            // Attempt to create a NSURL object. We may have received an error from
-            // URLWithUnicodeString above because the input is not valid for punycode
-            // conversion (example: non-LDH characters are invalid and will trigger
-            // an error with code == IFUnicodeURLConvertErrorSTD3NonLDH but may be
-            // allowed normally per RFC 1035.
-            url = [NSURL URLWithString:host];
-        }
-    }
-
-    if (!url) {
-        return NO;
-    }
-
-    // Should be encoded if necessary.
-    host = url.absoluteString;
-
-    NSInteger updatedHostLength = [host length];
-    if (updatedHostLength == 0) {
-        return NO;
-    } else if (updatedHostLength > originalHostLength) {
-        urlLength += (updatedHostLength - originalHostLength);
-    }
-
-    // Because the backend always adds https:// if we're missing a protocol, add this length
-    // back in when checking vs. our maximum allowed length of a URL, if necessary.
-    NSInteger urlLengthWithProtocol = urlLength;
-    if (!protocol) {
-        urlLengthWithProtocol += kURLProtocolLength;
-    }
-    return urlLengthWithProtocol <= kMaxURLLength;
-}
-
-@end
-
-NSString * const kTwitterTextParserConfigurationClassic = @"v1";
-NSString * const kTwitterTextParserConfigurationV2 = @"v2";
-
-static TwitterTextParser *sDefaultParser;
-
-@interface TwitterTextParser ()
-
-- (NSInteger)lengthOfText:(NSString *)text range:(NSRange)range countingBlock:(TextUnitCounterBlock)countingBlock;
-
-@end
-
-@implementation TwitterTextParser
-
-+ (dispatch_queue_t)_queue
-{
-    static dispatch_queue_t sQueue;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sQueue = dispatch_queue_create("twitterText", DISPATCH_QUEUE_SERIAL);
-    });
-    return sQueue;
-}
-
-- (instancetype)initWithConfiguration:(TwitterTextConfiguration *)configuration
-{
-    if (self = [super init]) {
-        _configuration = configuration;
-    }
-    return self;
-}
-
-+ (instancetype)defaultParser
-{
-    dispatch_sync([self _queue], ^{
-        if (!sDefaultParser) {
-            TwitterTextConfiguration *configuration = [TwitterTextConfiguration configurationFromJSONResource:kTwitterTextParserConfigurationClassic];
-            sDefaultParser = [[TwitterTextParser alloc] initWithConfiguration:configuration];
-        }
-    });
-    return sDefaultParser;
-}
-
-+ (void)setDefaultParserWithConfiguration:(TwitterTextConfiguration *)configuration
-{
-    dispatch_async([self _queue], ^{
-        sDefaultParser = [[TwitterTextParser alloc] initWithConfiguration:configuration];
-    });
-}
-
-- (NSInteger)maxWeightedTweetLength
-{
-    return _configuration.maxWeightedTweetLength;
-}
-
-- (TwitterTextParseResults *)parseTweet:(NSString *)text
-{
-    // Use Unicode Normalization Form Canonical Composition
-    NSString *normalizedText = [text precomposedStringWithCanonicalMapping];
-    NSRange rangeNotFound = NSMakeRange(NSNotFound, NSNotFound);
-
-    if (normalizedText.length == 0) {
-        NSRange rangeZero = NSMakeRange(0, 0);
-        return [[TwitterTextParseResults alloc] initWithWeightedLength:0 permillage:0 valid:YES displayRange:rangeZero validRange:rangeZero];
-    }
-
-    // Build an map of ranges, assuming the original character count does not change after normalization
-    NSRange textRanges[text.length], *ptr = textRanges;
-    for (NSInteger i = 0; i < text.length; i++) {
-        textRanges[i] = rangeNotFound;
-    }
-    [self lengthOfText:text range:NSMakeRange(0, text.length) countingBlock:^NSInteger(NSInteger index, NSString *text, TwitterTextEntity *entity, NSString *substring) {
-        // entity.range.length can be > 1 for emoji, decomposed characters, etc.
-        for (NSInteger i = 0; i < entity.range.length; i++) {
-            ptr[index+i] = entity.range;
-        }
-        return index + entity.range.length;
-    }];
-
-    NSRange normalizedRanges[normalizedText.length], *normalizedRangesPtr = normalizedRanges;
-    for (NSInteger i = 0; i < normalizedText.length; i++) {
-        normalizedRangesPtr[i] = rangeNotFound;
-    }
-
-    __block NSInteger offset = 0;
-    [self lengthOfText:normalizedText range:NSMakeRange(0, normalizedText.length) countingBlock:^NSInteger(NSInteger composedCharIndex, NSString *text, TwitterTextEntity *entity, NSString *substring) {
-        // map index of each composed char back to its pre-normalized index.
-        NSRange originalRange = ptr[composedCharIndex+offset];
-        for (NSInteger i = 0; i < entity.range.length; i++) {
-            normalizedRangesPtr[composedCharIndex+i] = originalRange;
-        }
-        if (originalRange.length > entity.range.length) {
-            offset += (originalRange.length - entity.range.length);
-        }
-        return composedCharIndex + entity.range.length;
-    }];
-
-    NSArray<TwitterTextEntity *> *urlEntities = [TwitterText URLsInText:normalizedText];
-
-    __block BOOL isValid = YES;
-    __block NSInteger weightedLength = 0;
-    __block NSInteger validStartIndex = NSNotFound, validEndIndex = NSNotFound;
-    __block NSInteger displayStartIndex = NSNotFound, displayEndIndex = NSNotFound;
-    TextUnitCounterBlock textUnitCountingBlock = ^NSInteger(NSInteger previousLength, NSString *text, TwitterTextEntity *entity, NSString *substring) {
-        NSRange range = entity.range;
-        NSInteger updatedLength = previousLength;
-        if (entity.type == TwitterTextEntityURL) {
-            updatedLength = previousLength + (self->_configuration.transformedURLLength * self->_configuration.scale);
-        } else if (entity.type == TwitterTextEntityTweetChar) {
-            updatedLength = previousLength + [self lengthOfWeightedChar:substring];
-        } else {
-            NSAssert(NO, @"Unhandled TwitterTextEntityType");
-        }
-        if (validStartIndex == NSNotFound) {
-            validStartIndex = range.location;
-        }
-        if (displayStartIndex == NSNotFound) {
-            displayStartIndex = range.location;
-        }
-        if (range.length > 0) {
-            displayEndIndex = NSMaxRange(range) - 1;
-        }
-        NSTextCheckingResult *invalidResult = [[TwitterText invalidCharacterRegexp] firstMatchInString:text options:0 range:range];
-        if (invalidResult) {
-            isValid = NO;
-        } else if (isValid && (updatedLength + weightedLength <= self.maxWeightedTweetLength * self->_configuration.scale)) {
-            validEndIndex = (range.length > 0) ? NSMaxRange(range) - 1 : range.location;
-        } else {
-            isValid = NO;
-        }
-        return updatedLength;
-    };
-
-    NSInteger textIndex = 0;
-    for (TwitterTextEntity *urlEntity in urlEntities) {
-        if (textIndex < urlEntity.range.location) {
-            weightedLength += [self lengthOfText:normalizedText range:NSMakeRange(textIndex, urlEntity.range.location - textIndex) countingBlock:textUnitCountingBlock];
-        }
-
-        weightedLength += textUnitCountingBlock(0, normalizedText, urlEntity, [normalizedText substringWithRange:urlEntity.range]);
-
-        textIndex = urlEntity.range.location + urlEntity.range.length;
-    }
-
-    // handle trailing text
-    weightedLength += [self lengthOfText:normalizedText range:NSMakeRange(textIndex, normalizedText.length - textIndex) countingBlock:textUnitCountingBlock];
-
-    NSAssert(!NSEqualRanges(normalizedRanges[displayStartIndex], rangeNotFound), @"displayStartIndex should map to existing index in original string");
-    NSAssert(!NSEqualRanges(normalizedRanges[displayEndIndex], rangeNotFound), @"displayEndIndex should map to existing index in original string");
-    NSAssert(!NSEqualRanges(normalizedRanges[validStartIndex], rangeNotFound), @"validStartIndex should map to existing index in original string");
-    NSAssert(!NSEqualRanges(normalizedRanges[validEndIndex], rangeNotFound), @"validEndIndex should map to existing index in original string");
-
-    NSRange displayRange = NSMakeRange(normalizedRanges[displayStartIndex].location, NSMaxRange(normalizedRanges[displayEndIndex]) - normalizedRanges[displayStartIndex].location);
-    NSRange validRange = NSMakeRange(normalizedRanges[validStartIndex].location, NSMaxRange(normalizedRanges[validEndIndex]) - normalizedRanges[validStartIndex].location);
-
-    NSInteger scaledWeightedLength = weightedLength / _configuration.scale;
-    NSInteger permillage = (NSInteger)(kPermillageScaleFactor * (scaledWeightedLength / (float)[self maxWeightedTweetLength]));
-    return [[TwitterTextParseResults alloc] initWithWeightedLength:scaledWeightedLength permillage:permillage valid:isValid displayRange:displayRange validRange:validRange];
-}
-
-#pragma mark -- Private methods
-
-- (NSInteger)lengthOfText:(NSString *)text range:(NSRange)range countingBlock:(TextUnitCounterBlock)countingBlock
-{
-    __block NSInteger length = 0;
-
-    [text enumerateSubstringsInRange:range options:NSStringEnumerationByComposedCharacterSequences usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
-        if (countingBlock != NULL) {
-            length = countingBlock(length, text, [TwitterTextEntity entityWithType:TwitterTextEntityTweetChar range:substringRange], substring);
-        }
-    }];
-
-    return length;
-}
-
-- (NSInteger)lengthOfWeightedChar:(NSString *)text
-{
-    NSInteger length = text.length;
-    if (length == 0) {
-        return 0;
-    }
-
-    UniChar buffer[length];
-    [text getCharacters:buffer range:NSMakeRange(0, length)];
-
-    NSInteger weightedLength = 0;
-    UniChar *ptr = buffer;
-    for (NSUInteger i = 0; i < length; i++) {
-        __block NSInteger charWeight = _configuration.defaultWeight;
-        BOOL isSurrogatePair = (i + 1 < length && CFStringIsSurrogateHighCharacter(ptr[i]) && CFStringIsSurrogateLowCharacter(ptr[i+1]));
-        for (TwitterTextWeightedRange *weightedRange in _configuration.ranges) {
-            NSInteger begin = weightedRange.range.location;
-            NSInteger end = weightedRange.range.location + weightedRange.range.length;
-
-            if (isSurrogatePair) {
-                UTF32Char char32 = CFStringGetLongCharacterForSurrogatePair(ptr[i], ptr[i+1]);
-                if (char32 >= begin && char32 <= end) {
-                    charWeight = weightedRange.weight;
-                    break;
-                }
-            } else if (ptr[i] >= begin && ptr[i] <= end) {
-                charWeight = weightedRange.weight;
-                break;
-            }
-        }
-        weightedLength += charWeight;
-
-        // skip the next char of the surrogate pair.
-        if (isSurrogatePair) {
-            i++;
-        }
-    }
-
-    return weightedLength;
-}
-
-@end
-
-@implementation TwitterTextWeightedRange
-
-- (instancetype)initWithRange:(NSRange)range weight:(NSInteger)weight
-{
-    self = [super init];
-    if (self) {
-        _range = range;
-        _weight = weight;
-    }
-    return self;
-}
-
-@end
-
-@implementation TwitterTextParseResults
-
-- (instancetype)initWithWeightedLength:(NSInteger)length permillage:(NSInteger)permillage valid:(BOOL)valid displayRange:(NSRange)displayRange validRange:(NSRange)validRange
-{
-    self = [super init];
-    if (self) {
-        _weightedLength = length;
-        _permillage = permillage;
-        _isValid = valid;
-        _displayTextRange = displayRange;
-        _validDisplayTextRange = validRange;
-    }
-    return self;
-}
-
-@end
-
-@implementation TwitterTextConfiguration
-
-- (instancetype)initWithJSONString:(NSString *)jsonString
-{
-    self = [super init];
-    if (self) {
-        NSError *jsonError = nil;
-        NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
-        NSDictionary *jsonDictionary = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&jsonError];
-
-        _version = [jsonDictionary[@"version"] integerValue];
-        _maxWeightedTweetLength = [jsonDictionary[@"maxWeightedTweetLength"] integerValue];
-        _scale = [jsonDictionary[@"scale"] integerValue];
-        _defaultWeight = [jsonDictionary[@"defaultWeight"] integerValue];
-        _transformedURLLength = [jsonDictionary[@"transformedURLLength"] integerValue];
-        NSArray *jsonRanges = jsonDictionary[@"ranges"];
-        NSMutableArray *ranges = [NSMutableArray arrayWithCapacity:jsonRanges.count];
-        for (NSDictionary *rangeDict in jsonRanges) {
-            NSRange range;
-            range.location = [rangeDict[@"start"] integerValue];
-            range.length = [rangeDict[@"end"] integerValue] - range.location;
-            NSInteger charWeight = [rangeDict[@"weight"] integerValue];
-            TwitterTextWeightedRange *charWeightObject = [[TwitterTextWeightedRange alloc] initWithRange:range weight:charWeight];
-            [ranges addObject:charWeightObject];
-        }
-        _ranges = [ranges copy];
-    }
-    return self;
-}
-
-+ (instancetype)configurationFromJSONResource:(NSString *)jsonResource
-{
-    NSError *error = nil;
-    NSString *sourceFile = [[NSBundle bundleForClass:self] pathForResource:jsonResource ofType:@"json"];
-    NSString *jsonString = [NSString stringWithContentsOfFile:sourceFile encoding:NSUTF8StringEncoding error:&error];
-    return !error ? [self configurationFromJSONString:jsonString] : nil;
-}
-
-+ (instancetype)configurationFromJSONString:(NSString *)jsonString
-{
-    return [[TwitterTextConfiguration alloc] initWithJSONString:jsonString];
 }
 
 @end
